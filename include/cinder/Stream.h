@@ -237,7 +237,7 @@ class IoStreamFile : public IoStream {
  
 	FILE						*mFile;
 	bool						mOwnsFile;
-	int32_t						mBufferSize, mDefaultBufferSize;
+	size_t						mBufferSize, mDefaultBufferSize;
 	std::shared_ptr<uint8_t>	mBuffer;
 	off_t						mBufferOffset; // actual offset to do IO from; incremented by IO
 	off_t						mBufferFileOffset; // beginning of the buffer in the file
@@ -298,9 +298,9 @@ class OStreamMem : public OStream {
 
 	virtual void		IOWrite( const void *t, size_t size );
 
-	void			*mBuffer;
+	void*			mBuffer;
 	size_t			mDataSize;
-	size_t			mOffset;
+	off_t			mOffset;
 };
 
 

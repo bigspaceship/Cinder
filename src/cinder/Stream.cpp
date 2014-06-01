@@ -194,7 +194,7 @@ size_t IStreamFile::readDataImpl( void *t, size_t size )
 		return size;
 	}
 	else if ( ( mBufferFileOffset < mBufferOffset ) && ( mBufferOffset < mBufferFileOffset + (off_t)mBufferSize ) ) { // partially inside
-		size_t amountInBuffer = ( mBufferFileOffset + mBufferSize ) - mBufferOffset;
+		size_t amountInBuffer = ( (size_t)mBufferFileOffset + mBufferSize ) - (size_t)mBufferOffset;
 		memcpy( t, mBuffer.get() + ( mBufferOffset - mBufferFileOffset ), amountInBuffer );
 		mBufferOffset += amountInBuffer;
 		return amountInBuffer + readDataImpl( reinterpret_cast<uint8_t*>( t ) + amountInBuffer, size - amountInBuffer );
@@ -218,7 +218,7 @@ size_t IStreamFile::readDataImpl( void *t, size_t size )
 void IStreamFile::seekAbsolute( off_t absoluteOffset )
 {
 	int dir = ( absoluteOffset >= 0 ) ? SEEK_SET : SEEK_END;
-	absoluteOffset = abs( absoluteOffset );
+	absoluteOffset = llabs( absoluteOffset );
 	if( fseek( mFile, static_cast<long>( absoluteOffset ), dir ) )
 		throw StreamExc();
 	mBufferOffset = absoluteOffset;
@@ -289,14 +289,14 @@ off_t OStreamFile::tell() const
 void OStreamFile::seekAbsolute( off_t absoluteOffset )
 {
 	int dir = ( absoluteOffset >= 0 ) ? SEEK_SET : SEEK_END;
-	absoluteOffset = abs( absoluteOffset );
+	absoluteOffset = llabs( absoluteOffset );
 	if( fseek( mFile, static_cast<long>( absoluteOffset ), dir ) )
 		throw StreamExc();
 }
 
 void OStreamFile::seekRelative( off_t relativeOffset )
 {
-	fseek( mFile, relativeOffset, SEEK_CUR );
+	fseek( mFile, (size_t)relativeOffset, SEEK_CUR );
 }
 
 void OStreamFile::IOWrite( const void *t, size_t size )
@@ -338,7 +338,7 @@ size_t IoStreamFile::readDataAvailable( void *dest, size_t maxSize )
 void IoStreamFile::seekAbsolute( off_t absoluteOffset )
 {
 	int dir = ( absoluteOffset >= 0 ) ? SEEK_SET : SEEK_END;
-	absoluteOffset = abs( absoluteOffset );
+	absoluteOffset = llabs( absoluteOffset );
 	if( fseek( mFile, static_cast<long>( absoluteOffset ), dir ) )
 		throw StreamExc();
 	mBufferOffset = absoluteOffset;
@@ -389,7 +389,7 @@ size_t IoStreamFile::readDataImpl( void *t, size_t size )
 		return size;
 	}
 	else if ( ( mBufferFileOffset < mBufferOffset ) && ( mBufferOffset < mBufferFileOffset + (off_t)mBufferSize ) ) { // partially inside
-		size_t amountInBuffer = ( mBufferFileOffset + mBufferSize ) - mBufferOffset;
+		size_t amountInBuffer = ( (size_t)mBufferFileOffset + mBufferSize ) - (size_t)mBufferOffset;
 		memcpy( t, mBuffer.get() + ( mBufferOffset - mBufferFileOffset ), amountInBuffer );
 		mBufferOffset += amountInBuffer;
 		return amountInBuffer + readDataImpl( reinterpret_cast<uint8_t*>( t ) + amountInBuffer, size - amountInBuffer );
@@ -453,7 +453,7 @@ void IStreamMem::seekAbsolute( off_t absoluteOffset )
 {
 	if( absoluteOffset < 0 )
 		absoluteOffset = mDataSize + absoluteOffset;
-	mOffset = absoluteOffset;
+	mOffset = (size_t)absoluteOffset;
 	if( absoluteOffset > static_cast<off_t>( mDataSize ) )
 		throw StreamExc();
 }
@@ -579,31 +579,37 @@ IoStreamFileRef readWriteFileStream( const fs::path &path )
 void loadStreamMemory( IStreamRef is, std::shared_ptr<uint8_t> *resultData, size_t *resultDataSize )
 {
 	// prevent crash if stream is not valid
-	if(!is) throw StreamExc();
+	if( ! is )
+		throw StreamExc();
 
-	off_t fileSize = is->size();
-	if( fileSize > std::numeric_limits<off_t>::max() )
+	off_t fileSizeOff = is->size();
+	if( fileSizeOff > std::numeric_limits<size_t>::max() )
 		throw StreamExcOutOfMemory();
+
+	size_t fileSize = (size_t)fileSizeOff;
 	
 	*resultData = std::shared_ptr<uint8_t>( (uint8_t*)malloc( fileSize ), free );
 	if( ! (*resultData ) )
 		throw StreamExcOutOfMemory();
 
-	*resultDataSize = static_cast<size_t>( fileSize );
+   *resultDataSize = fileSize;
 	is->readDataAvailable( resultData->get(), fileSize );
 }
 
 Buffer loadStreamBuffer( IStreamRef is )
 {
 	// prevent crash if stream is not valid
-	if(!is) throw StreamExc();
+	if( ! is )
+		throw StreamExc();
 
-	off_t fileSize = is->size();
-	if( fileSize > std::numeric_limits<off_t>::max() )
+	off_t fileSizeOff = is->size();
+	if( fileSizeOff > std::numeric_limits<size_t>::max() )
 		throw StreamExcOutOfMemory();
-	
+
+	size_t fileSize = (size_t)fileSizeOff;
+
 	if( fileSize ) { // sometimes fileSize will be zero for a stream that doesn't know how big it is
-		Buffer result( fileSize );
+		Buffer result( (size_t)fileSize );
 		is->readDataAvailable( result.getData(), fileSize );
 		return result;
 	}
